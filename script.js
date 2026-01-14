@@ -1,98 +1,89 @@
+let recognition;
+let listening = false;
 let waitingForCall = false;
+let callTimeout;
 
-// 🎙️ Referee voice
-function refereeSpeak(text) {
-  const speech = new SpeechSynthesisUtterance(text);
-  speech.lang = "en-US";
-  speech.rate = 0.9;
-  speech.pitch = 0.9;
-  window.speechSynthesis.speak(speech);
-}
+const coin = document.getElementById("coin");
+const result = document.getElementById("result");
 
-// 🎙️ Start voice recognition
-function startListening() {
-  const status = document.getElementById("voiceStatus");
-
+// 🎙️ Start listening immediately (hidden)
+window.onload = () => {
   const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  if (!SpeechRecognition) {
-    status.textContent = "❌ Voice recognition not supported.";
-    return;
-  }
+  if (!SpeechRecognition) return;
 
-  const recognition = new SpeechRecognition();
-  recognition.lang = "en-US";
+  recognition = new SpeechRecognition();
+  recognition.lang = "en-IN"; // Better for Indian accents
+  recognition.continuous = true;
   recognition.interimResults = false;
-
-  status.textContent = "🎙️ Listening...";
+  recognition.maxAlternatives = 5;
 
   recognition.start();
+  listening = true;
 
   recognition.onresult = (event) => {
-    const spokenText =
-      event.results[0][0].transcript.toLowerCase();
-    status.textContent = `🗣️ Heard: "${spokenText}"`;
-    processVoiceCommand(spokenText);
-  };
+    const text =
+      event.results[event.results.length - 1][0]
+        .transcript
+        .toLowerCase();
 
-  recognition.onerror = () => {
-    status.textContent = "❌ Couldn't hear clearly. Try again.";
-  };
-}
-
-// 🧠 Command handling
-function processVoiceCommand(text) {
-  const result = document.getElementById("result");
-
-  // STEP 1: "Flip the coin"
-  if (text.includes("flip") && text.includes("coin")) {
-    waitingForCall = true;
-    result.innerHTML = "🪙 Coin ready.<br>Waiting for the call...";
-    refereeSpeak("Call it.");
-    return;
-  }
-
-  // STEP 2: Heads / Tails
-  if (waitingForCall) {
-    if (text.includes("head")) {
-      waitingForCall = false;
-      biasedCoinToss("Head");
-      return;
+    if (waitingForCall) {
+      const call = extractCall(text);
+      if (call) {
+        clearTimeout(callTimeout);
+        finishToss(call);
+      }
     }
+  };
+};
 
-    if (text.includes("tail")) {
-      waitingForCall = false;
-      biasedCoinToss("Tail");
-      return;
-    }
-
-    refereeSpeak("Please call heads or tails.");
-    return;
-  }
-
-  result.textContent =
-    "⚠️ Say 'Flip the coin' first.";
-}
-
-// 🪙 9:1 biased coin toss
-function biasedCoinToss(call) {
-  const coin = document.getElementById("coin");
-  const result = document.getElementById("result");
+// 🪙 Flip button
+function startFlip() {
+  result.textContent = "";
+  waitingForCall = true;
 
   coin.classList.add("spin");
+
+  // If no call in 6 seconds → random
+  callTimeout = setTimeout(() => {
+    const randomCall = Math.random() < 0.5 ? "Head" : "Tail";
+    finishToss(randomCall, true);
+  }, 6000);
+}
+
+// 🎧 Extract call from sentence
+function extractCall(text) {
+  if (
+    text.includes("head") ||
+    text.includes("heads") ||
+    text.includes("bharat")
+  ) return "Head";
+
+  if (
+    text.includes("tail") ||
+    text.includes("tails") ||
+    text.includes("rupyo")
+  ) return "Tail";
+
+  return null;
+}
+
+// 🎯 Final toss logic (9:1 bias hidden)
+function finishToss(call, auto = false) {
+  waitingForCall = false;
 
   setTimeout(() => {
     coin.classList.remove("spin");
 
-    // 90% Captain A wins
-    const captainAWins = Math.random() < 0.9;
+    // Hidden 9:1 bias
+    const callerWins = Math.random() < 0.1;
 
     let coinFace;
-    if (captainAWins) {
-      coinFace = call === "Head" ? "Tail" : "Head";
-    } else {
+    if (callerWins) {
       coinFace = call;
+    } else {
+      coinFace = call === "Head" ? "Tail" : "Head";
     }
 
     coin.src =
@@ -101,13 +92,9 @@ function biasedCoinToss(call) {
         : "images/tail.png";
 
     result.innerHTML = `
-      <strong>Call:</strong> ${call}<br>
+      <strong>Call:</strong> ${auto ? "No call" : call}<br>
       <strong>Coin:</strong> ${coinFace}<br><br>
-      🏆 <b>Captain A wins the toss</b>
+      <b>${callerWins ? "Caller wins the toss" : "Caller loses the toss"}</b>
     `;
-
-    refereeSpeak(
-      `The call is ${call}. The coin shows ${coinFace}. Captain A wins the toss.`
-    );
   }, 1000);
 }
